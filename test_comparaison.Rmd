@@ -1,0 +1,1091 @@
+---
+title: "Test de comparaison"
+output: 
+  pdf_document: 
+    keep_tex: yes
+author: ""
+date: ""
+fontsize: 14pt
+geometry: margin=1in
+editor_options: 
+  chunk_output_type: console
+---
+```{r include=FALSE}
+# Importation des libraries
+library(reshape2)
+library(ggplot2)
+library(missMDA)
+library(exactRankTests)
+library(coin)
+library(stringr)
+library(tidyverse)
+library(RVAideMemoire)
+library(rstatix)
+library(knitr)
+library(stringr)
+```
+```{r include = FALSE}
+df <- read.csv("~/Desktop/M2-SAAD/stage_proj/data.csv", sep = ",",
+                    na.strings = c(NA, ""), row.names = 1)
+
+res.X_imputes <- imputeFAMD(df, ncp = 3)
+donnees <- res.X_imputes$completeObs
+donnees <- donnees[-c(91, 263, 337:339), ]
+options(width = 70, digits = 3, tinytex.verbose = TRUE)
+```
+
+```{r include=FALSE}
+# Remplacement des mauvais caractères par les bons.
+bad_carac <- c('à©', 'à®', 'à¨', 'à§')
+good_carac <- c('é', 'î', 'è', 'ç')
+for(jj in 1:5){
+  for (ii in 1:length(good_carac)) {
+  donnees$CSPMere <- factor(sapply(X = donnees$CSPMere, 
+                            FUN = function(x){return(str_replace(x, bad_carac[ii], good_carac[ii]))}))
+  donnees$CSPPere <- factor(sapply(X = donnees$CSPPere,
+                            FUN = function(x){return(str_replace(x, bad_carac[ii], good_carac[ii]))})) 
+  }
+}
+attach(donnees)
+n <- nrow(donnees)
+```
+
+
+# I. Comparaison de proportions
+## 1. Entre garçons et filles
+```{r include = FALSE}
+# Le nombre de genre dans l'échantillon
+res <- summary(GenreEft)
+
+p0 <- 0.5
+pvalueFM <- binom.test(res[2], sum(res), p0)$p.value
+pvalueFM
+```
+```{r include=FALSE}
+bar <- ggplot(data = donnees) + geom_bar(aes(x = GenreEft, fill=GenreEft),
+                                         show.legend = TRUE, width = 1) + 
+  theme(aspect.ratio = 1) + labs(x = NULL, y = NULL)
+bar + coord_polar() + ggtitle('Proportions de filles et de garçons.')
+```
+![Garçon Fille](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/garconFille.png)
+Comme la p-valeur est égale à `r pvalueFM` alors les données ne nous permettent pas le rejet de $H_0$. Ainsi nous pouvons affirmer avec un risque de 5% que la proportion d'enfant de sexe masculin n'est pas différent de 50%.
+Par suite nous pouvons prétendre avoir 50% de filles et 50% de garçons dans l'échantillon.
+
+## 2. Niveau d'éducation des mères
+
+```{r include=FALSE}
+barMere <- ggplot(data = donnees) + 
+  geom_bar(aes(x = NiveauEtudeMere, fill=NiveauEtudeMere),
+           show.legend = TRUE, width = 1) + 
+  theme(aspect.ratio = 1) + labs(x = NULL, y = NULL)
+barMere + coord_polar() + ggtitle("Proportions du niveau d'éducation des mères")
+```
+![Niveau d'éducation des mères](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/educMere.png)
+```{r include=FALSE}
+resMere <- summary(NiveauEtudeMere)
+M <- cbind(resMere, rep(n, length(resMere)) - resMere)
+(pvalue <- fisher.test(M, simulate.p.value = TRUE)$p.value)
+# Test post-hoc
+fisher.multcomp(M, p.method = "bonferroni")
+```
+On a la p.valeur $=$ `r pvalue` $\le 0.001$, donc le rejet de $H_0$ est hautement significatif. Ainsi on peut prétendre que les populations des parents ont des niveaux d'éducation significativement inhomogène quant à la proportion inconnue des mères.
+
+Par identification, la plus petite p-valeur correspond au test de comparaison de proportion inconnue des mères ayant le niveau collège et celle des mères ayant eu leur master, avec p-valeur = $1.668\times10^{-26}$. Ce sont donc les proportions qui diffèrent le plus et cette différence est hautement significative.
+
+## 3. Mère salariée et temps de travail
+
+```{r include=FALSE}
+barMereSal <- ggplot(data = donnees) + 
+  geom_bar(aes(x = MereSalariee, fill=MereSalariee), show.legend = TRUE, width = 1) + 
+  theme(aspect.ratio = 1) + labs(x = NULL, y = NULL)
+barMereSal + coord_polar() + ggtitle("Proportions du temps de travail des mère")
+```
+![Mères salariées et temps de travail](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/salaireMere.png)
+```{r include=FALSE}
+resMereSal <- summary(MereSalariee)
+M <- cbind(resMereSal, rep(n, length(resMereSal)) - resMereSal)
+(pvalue <- fisher.test(M, simulate.p.value = T)$p.value)
+# Test post-hoc
+fisher.multcomp(M, p.method = "bonferroni")
+```
+On a la p.valeur $=$ `r pvalue` $\le 0.001$, donc le rejet de $H_0$ est hautement significatif. Ainsi on peut prétendre que les populations des parents ont des temps de travail significativement inhomogène quant à la proportion inconnue des mères.
+
+Par identification, la plus petite p-valeur correspond au test de comparaison de proportion inconnue des mères travaillant à temps complet et celle des mères ayant un travail occasionnel\slash saisonnier, avec p-valeur = $3.041\times10^{-64}$. Ce sont donc les proportions qui diffèrent le plus et cette différence est hautement significative.
+
+## 4. Catégorie socio-professionnelle des mères
+
+```{r include=FALSE}
+barMereCSP <- ggplot(data = donnees) + 
+  geom_bar(aes(x = CSPMere, fill=CSPMere), show.legend = FALSE, width = 1) + 
+  theme(aspect.ratio = 1) + labs(x = NULL, y = NULL)
+barMereCSP + coord_polar() + ggtitle("Proportions socio-professionnelle des mères")
+```
+![CSP mères](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/cspMere.png)
+```{r include=FALSE}
+resMereCSP <- summary(CSPMere)
+M <- cbind(resMereCSP, rep(n, length(resMereCSP)) - resMereCSP)
+(pvalue <- fisher.test(M, simulate.p.value = T)$p.value)
+# Test post-hoc
+fisher.multcomp(M, p.method = "bonferroni")
+```
+On a la p.valeur $=$ `r pvalue` $\le 0.001$, donc le rejet de $H_0$ est hautement significatif. Ainsi on peut dire que les populations des parents ont des catégories socio-professionnelles significativement inhomogène quant à la proportion inconnue des mères.
+
+Par identification, la plus petite p-valeur correspond au test de comparaison de proportion inconnue des mères travaillant en intérim et dans le domaine sanitaire et social et celle des mères ouvrières qualifiée ou des mères travaillant en intérim et dans le domaine sanitaire et social et celle des mères au foyer , avec p-valeur = $2.228\times10^{-12}$. Ce sont donc les proportions qui diffèrent le plus et cette différence est hautement significative.
+
+## 5. Niveau d'éducation des pères
+
+```{r include=FALSE}
+barMere <- ggplot(data = donnees) + 
+  geom_bar(aes(x = NiveauEtudePere, fill=NiveauEtudePere), show.legend = TRUE, width = 1) + 
+  theme(aspect.ratio = 1) + labs(x = NULL, y = NULL)
+barMere + coord_polar() + ggtitle("Proportions du niveau d'éducation des pères")
+```
+![Niveau d'éducation des pères](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/educPere.png)
+```{r include=FALSE}
+resPere <- summary(NiveauEtudePere)
+M <- cbind(resPere, rep(n, length(resPere)) - resPere)
+(pvalue <- fisher.test(M, simulate.p.value = TRUE)$p.value)
+# Test post-hoc
+fisher.multcomp(M, p.method = "bonferroni")
+```
+On a la p.valeur $=$ `r pvalue` $\le 0.001$, donc le rejet de $H_0$ est hautement significatif. Ainsi on peut prétendre que les populations des parents ont des niveaux d'éducation significativement inhomogène quant à la proportion inconnue des pères.
+
+Par identification, la plus petite p-valeur correspond au test de comparaison de proportion inconnue des pères ayant le niveau collège et celle des pères ayant eu leur master, avec p-valeur = $1.162\times10^{-17}$. Ce sont donc les proportions qui diffèrent le plus et cette différence est hautement significative.
+
+## 6. Père salariée et temps de travail
+ 
+```{r include=FALSE}
+barPereSal <- ggplot(data = donnees) + 
+  geom_bar(aes(x = PereSalarie, fill=PereSalarie), show.legend = TRUE, width = 1) + 
+  theme(aspect.ratio = 1) + labs(x = NULL, y = NULL)
+barPereSal + coord_polar() + ggtitle("Proportions du temps de travail des père")
+```
+
+![Pères salariés](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/salairePere.png)
+
+```{r include=FALSE}
+resPereSal <- summary(PereSalarie)
+M <- cbind(resPereSal, rep(n, length(resPereSal)) - resPereSal)
+(pvalue <- fisher.test(M, simulate.p.value = T)$p.value)
+# Test post-hoc
+fisher.multcomp(M, p.method = "bonferroni")
+```
+On a la p.valeur $=$ `r pvalue` $\le 0.001$, donc le rejet de $H_0$ est hautement significatif. Ainsi on peut prétendre que les populations des parents ont des temps de travail significativement inhomogène quant à la proportion inconnue des pères.
+
+Par identification, la plus petite p-valeur correspond au test de comparaison de proportion inconnue des pères travaillant à temps complet et celle des pères ayant pas de travail, avec p-valeur = $9.227\times10^{-154}$. Ce sont donc les proportions qui diffèrent le plus et cette différence est hautement significative.
+
+## 7. Catégorie socio-professionnelle des pères
+
+```{r include=FALSE}
+barPereCSP <- ggplot(data = donnees) + 
+  geom_bar(aes(x = CSPPere, fill=CSPPere), show.legend = FALSE, width = 1) + 
+  theme(aspect.ratio = 1) + labs(x = NULL, y = NULL)
+barPereCSP + coord_polar() + ggtitle("Proportions socio-professionnelle des mères")
+```
+![CSP pères](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/cspPere.png)
+```{r include=FALSE}
+resPereCSP <- summary(CSPPere)
+M <- cbind(resPereCSP, rep(n, length(resPereCSP)) - resPereCSP)
+(pvalue <- fisher.test(M, simulate.p.value = T)$p.value)
+# Test post-hoc
+fisher.multcomp(M, p.method = "bonferroni")
+```
+On a la p.valeur $=$ `r pvalue` $\le 0.001$, donc le rejet de $H_0$ est hautement significatif. Ainsi on peut dire que les populations des parents ont des catégories socio-professionnelles significativement inhomogène quant à la proportion inconnue des pères.
+
+Par identification, la plus petite p-valeur correspond au test de comparaison de proportion inconnue des pères au foyer, des pères personnel de service direct aux particuliers, des pères sans activité professionnelle et des pères intérim administration et commerce en Entreprise avec pères ouvriers qualifié, avec p-valeur = $2.210\times10^{-25}$. Ce sont donc les proportions qui diffèrent le plus et cette différence est hautement significative.
+
+## 8. Naissance
+```{r include = FALSE}
+# Le nombre de genre dans l'échantillon
+res <- summary(NaisTermeGros)
+p0 <- res[1] / n
+pvalueFM <- binom.test(res[2], sum(res), p0)$p.value
+pvalueFM
+```
+```{r include=FALSE}
+bar <- ggplot(data = donnees) + 
+  geom_bar(aes(x = NaisTermeGros, fill=NaisTermeGros), show.legend = TRUE, width = 1) + 
+  theme(aspect.ratio = 1) + labs(x = NULL, y = NULL)
+bar + coord_polar() + ggtitle('Proportions de naissance à terme et prématurée')
+```
+![Naissance](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/naissance.png)
+Comme la p-valeur est égale à `r pvalueFM` alors le rejet de $H_0$ est hautement significatif. Ainsi nous pouvons affirmer avec un risque de 5% que la proportion des naissances à terme est différente de celle des naissances prématurées.
+
+## 9. Hospitalisation
+```{r include = FALSE}
+# Le nombre de genre dans l'échantillon
+res <- summary(EftHospitalPlus1Nuit)
+
+p0 <- res[2] / n
+pvalueFM <- binom.test(res[1], sum(res), p0)$p.value
+pvalueFM
+```
+```{r include=FALSE}
+bar <- ggplot(data = donnees) + 
+  geom_bar(aes(x = EftHospitalPlus1Nuit, fill=EftHospitalPlus1Nuit), show.legend = TRUE, width = 1) + 
+  theme(aspect.ratio = 1) + labs(x = NULL, y = NULL)
+bar + coord_polar() + ggtitle('Proportions de hospitalisation et  de non hospitalisation')
+```
+![Hospitalisation](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/hospitalisation.png)
+Comme la p-valeur est égale à `r pvalueFM` alors le rejet de $H_0$ est hautement significatif. Ainsi nous pouvons affirmer avec un risque de 5% que la proportion des enfants hospitalisés est différente de celle qui ne sont pas hospitalisés.
+
+## 10. Allergie
+```{r include = FALSE}
+# Le nombre de genre dans l'échantillon
+res <- summary(EftAll)
+
+p0 <- res[2] / n
+pvalueFM <- binom.test(res[1], sum(res), p0)$p.value
+pvalueFM
+```
+```{r include=FALSE}
+bar <- ggplot(data = donnees) + 
+  geom_bar(aes(x = EftAll, fill=EftAll), show.legend = TRUE, width = 1) + 
+  theme(aspect.ratio = 1) + labs(x = NULL, y = NULL)
+bar + coord_polar() + 
+  ggtitle('Proportions des enfants qui sont allergiques et ceux ne le sont pas.')
+```
+![Allergie](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/allergie.png)
+Comme la p-valeur est égale à `r pvalueFM` alors le rejet de $H_0$ est hautement significatif. Ainsi nous pouvons affirmer avec un risque de 5% que la proportion des enfants non allergique est différente de celle qui sont allergiques.
+
+## 11. Vie en couple
+```{r include = FALSE}
+# Le nombre de genre dans l'échantillon
+res <- summary(VieCouple)
+
+p0 <- res[2] / n
+pvalueFM <- binom.test(res[1], sum(res), p0)$p.value
+pvalueFM
+```
+```{r include=FALSE}
+bar <- ggplot(data = donnees) + 
+  geom_bar(aes(x = VieCouple, fill=VieCouple), show.legend = TRUE, width = 1) + 
+  theme(aspect.ratio = 1) + labs(x = NULL, y = NULL)
+bar + coord_polar() + 
+  ggtitle('Proportions des parents en couple et ceux sont seuls')
+```
+![Vie en couple](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/vieCouple.png)
+Comme la p-valeur est égale à `r pvalueFM` alors le rejet de $H_0$ est hautement significatif. Ainsi nous pouvons affirmer avec un risque de 5% que la proportion des parents en couple est différente de ceux qui sont seuls.
+
+## 12. Niveau de revenu annuel du foyer
+
+```{r include=FALSE}
+bar <- ggplot(data = donnees) + 
+  geom_bar(aes(x = RevenuAnFoyer, fill=RevenuAnFoyer), show.legend = TRUE, width = 1) + 
+  theme(aspect.ratio = 1) + labs(x = NULL, y = NULL)
+bar + coord_polar() + 
+  ggtitle('Proportions des revenus annuels des foyers')
+```
+![Niveau de revenu annuel du foyer](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/revFoyer.png)
+```{r include=FALSE}
+resRev <- summary(RevenuAnFoyer)
+M <- cbind(resRev, rep(n, length(resRev)) - resRev)
+(pvalue <- fisher.test(M)$p.value)
+# Test post-hoc
+fisher.multcomp(M, p.method = "bonferroni")
+```
+On a la $\le 0.001$ p.valeur $=$ `r pvalue` $\le 0.01$, donc le rejet de $H_0$ est très significatif. Ainsi on peut dire que les revenus annuels des foyers sont très significativement non-homogène.
+
+Par identification, la plus petite p-valeur correspond au test de comparaison de proportion inconnue des revenus annuels des foyers compris entre $15000$ et $25000$ et celle dont les revenus annuels sont entre $25000$ et $35000$, avec p-valeur = $1.55\times10^{-2}$. Ce sont donc les proportions qui diffèrent le plus.
+
+## 13. Nombre de déménagement
+
+```{r include=FALSE}
+bar <- ggplot(data = donnees) + 
+  geom_bar(aes(x = NbreDemenageDep8Nais, fill=NbreDemenageDep8Nais), show.legend = TRUE, width = 1) + 
+  theme(aspect.ratio = 1) + labs(x = NULL, y = NULL)
+bar + coord_polar() + 
+  ggtitle('Proportions de nombre de déménagements')
+```
+![Nombre de déménagements](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/nbreDem.png)
+```{r include=FALSE}
+resDem <- summary(NbreDemenageDep8Nais)
+M <- cbind(resDem, rep(n, length(resDem)) - resDem)
+(pvalue <- fisher.test(M)$p.value)
+# Test post-hoc
+fisher.multcomp(M, p.method = "bonferroni")
+```
+On a $0.001 \le$ p.valeur $=$ `r pvalue`, donc le rejet de $H_0$ est hautement significatif. Ainsi on peut prétendre que le nombre de déménagements des parents sont hautement significativement non-homogènes.
+
+Par identification, la plus petite p-valeur correspond au test de comparaison de proportion inconnue des foyers ayant déménagé plus de deux fois et celle des foyers n'ayant pas déménagé, avec p-valeur = $2.33\times10^{-50}$. Ce sont donc les proportions qui diffèrent le plus et cette différence est hautement significative.
+
+# II. Test de rangs
+```{r include=FALSE}
+cls1 <- '"1"   "3"   "4"   "8"   "12"  "15"  "17"  "32"  "33"  "35"  "37"  "39"  "42"  "50" 
+"58"  "62"  "64"  "66"  "67"  "71"  "74"  "76"  "81"  "90"  "98"  "102" "103" "104"
+"106" "108" "110" "112" "114" "116" "127" "135" "136" "146" "148" "152" "153" "156"
+"162" "170" "175" "178" "182" "186" "187" "189" "191" "194" "197" "198" "200" "209"
+"210" "211" "220" "222" "225" "229" "230" "231" "232" "252" "255" "259" "260" "264"
+"265" "266" "272" "273" "276" "277" "281" "284" "285" "286" "288" "290" "296" "305"
+"310" "315" "317" "320" "321" "332"'
+
+cls2 <- '"5"   "7"   "14"  "16"  "18"  "19"  "23"  "25"  "30"  "38"  "41"  "43"  "44"  "47" 
+ "56"  "60"  "79"  "82"  "89"  "95"  "100" "101" "115" "120" "121" "122" "130" "133"
+ "134" "139" "142" "147" "155" "158" "163" "164" "165" "167" "168" "173" "180" "193"
+ "205" "208" "217" "227" "238" "241" "242" "244" "246" "249" "251" "253" "256" "262"
+ "270" "271" "275" "280" "289" "291" "292" "298" "301" "303" "309" "312" "313" "314"
+"323" "327" "328" "329" "331" “334"'
+
+cls3 <- '"13"  "21"  "24"  "26"  "27"  "40"  "45"  "46"  "48"  "51"  "55"  "68"  "72"  "73" 
+"75"  "77"  "78"  "80"  "84"  "85"  "86"  "88"  "96"  "99"  "105" "117" "119" "123"
+"124" "125" "129" "131" "132" "137" "138" "141" "143" "145" "149" "151" "154" "157"
+ "159" "160" "161" "169" "171" "172" "174" "176" "177" "181" "185" "188" "190" "196"
+ "202" "206" "216" "218" "219" "221" "224" "226" "228" "233" "235" "247" "257" "258"
+ "267" "274" "279" "283" "293" "294" "297" "299" "302" "306" "311" "316" "319" "322"
+"324" "333"'
+
+cls4 <- '"2"   "6"   "9"   "10"  "11"  "20"  "22"  "28"  "29"  "31"  "34"  "36"  "49"  "52" 
+"53"  "54"  "57"  "59"  "61"  "63"  "65"  "69"  "70"  "83"  "87"  "92"  "93"  "94" 
+ "97"  "107" "109" "111" "113" "118" "126" "128" "140" "144" "150" "166" "179" "183"
+ "184" "192" "195" "199" "201" "203" "204" "207" "212" "213" "214" "215" "223" "234"
+ "236" "237" "239" "240" "243" "245" "248" "250" "254" "261" "268" "269" "278" "282"
+ "287" "295" "300" "304" "307" "308" "318" "325" "326" "330" "335" "336"'
+
+(cls1 <- as.numeric(unlist(str_extract_all(cls1, "\\d{1,3}"))))
+(cls2 <- as.numeric(unlist(str_extract_all(cls2, "\\d{1,3}"))))
+(cls3 <- as.numeric(unlist(str_extract_all(cls3, "\\d{1,3}"))))
+(cls4 <- as.numeric(unlist(str_extract_all(cls4, "\\d{1,3}"))))
+
+cls <- rep(0, 339)
+for(c in 1:339){
+  if(!(c %in% c(91, 263, 337:339))){
+    if(c %in% cls1)
+      cls[c] <- 'cluster1'
+    if(c %in% cls2)
+      cls[c] <- 'cluster2'
+    if(c %in% cls3)
+      cls[c] <- 'cluster3'
+    if(c %in% cls4)
+      cls[c] <- 'cluster4'
+    if(!(c %in% c(cls1, cls2, cls3, cls4)))
+      print(c)
+    }
+}
+cls <- cls[cls != 0]
+donnees <- cbind(cls, donnees)
+attach(donnees)
+# Vecteur des couleurs
+# colors_ = c("#149414", '#955628', "#6C0277", "#007FFF")
+colors_ <- c('#e5e7e9', '#bdc3c7', '#909497', '#626567')
+```
+<!-- # ```{r include=FALSE} -->
+<!-- # # Les données par cluster -->
+<!-- # dfclus1 <- filter(donnees, cls=='cluster1') -->
+<!-- # dfclus2 <- filter(donnees, cls=='cluster2') -->
+<!-- # dfclus3 <- filter(donnees, cls=='cluster3') -->
+<!-- # dfclus4 <- filter(donnees, cls=='cluster4') -->
+<!-- # ``` -->
+## 1. Manque d'appétit
+```{r include=FALSE}
+  ggplot(data = donnees, aes(x = cls, y=ManqueAppetit, fill=NULL)) + 
+  geom_boxplot(show.legend = TRUE, fill=colors_) + 
+  theme_bw() + labs(x = NULL, y = NULL) 
+```
+![manque d'appétit](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/manqueAppetit.png){#manqueAppetit}
+D'après le graphique [manque d'appétit](#manqueAppetit) nous pouvons supposer une différence de scores de manque d'appétit dans les 04 clusters.
+```{r include=FALSE}
+k1 <- kruskal_test(ManqueAppetit~cls, data = donnees)
+k1
+# Comparaison par paires
+w1 <- wilcox_test(ManqueAppetit~cls, data = donnees,
+            p.adjust.method = "bonferroni")
+w1
+```
+
+### Test de Kruskal pour le manque d'appétit
+df : degree of freedom
+````{r echo = FALSE, results = 'asis'}
+kable(k1)
+````
+p : p-valeur
+p.adj : p-valeur adjustée
+p.adj.signif : significativité de la p-valeur
+
+### Test post-hoc de Wilcoxon Mann Whitney pour le manque d'appétit
+````{r echo = FALSE, results = 'asis'}
+kable(w1)
+
+````
+On a $0.01\le$ p-valeur $=0.00128\le 0.001$ donc on peut rejeter $H_0$ et ce rejet est très significatif. Alors nous pouvons dire que les scores de manque d'appétit dans moins deux clusters sont différents. Le manque d'appétit est très significativement différent seulement dans les clusters 1 et 4 avec une p-valeur $=10^{-2}$.
+
+## 2. Manque de plaisir
+```{r include=FALSE}
+  ggplot(data = donnees, aes(x = cls, y=ManquePlaisir, fill=NULL)) + 
+  geom_boxplot(show.legend = TRUE, fill=colors_) + 
+  scale_y_continuous(limits = c(2, 15), breaks = c(4, 8, 12)) +
+  theme_bw() + labs(x = NULL, y = NULL) 
+```
+![manque de plaisir](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/manquePlaisir.png){#manquePlaisir}
+
+Du graphique [manque de plaisir](#manquePlaisir) nous pouvons supposer une différence de scores de manque de plaisir dans les 04 clusters.
+```{r include=FALSE}
+k2 <- kruskal_test(ManquePlaisir~cls, data = donnees)
+k2
+# Comparaison par paires
+w2 <- wilcox_test(ManquePlaisir~cls, data = donnees,
+            p.adjust.method = "bonferroni")
+w2
+```
+
+### Test de Kruskal pour le manque de plaisir
+
+````{r echo = FALSE, results = 'asis'}
+kable(k2)
+````
+
+### Test post-hoc de Wilcoxon Mann Whitney pour le manque de plaisir
+````{r echo = FALSE, results = 'asis'}
+kable(w2)
+
+````
+On a p-valeur $=3.10^{-5}\le 0.001$ donc on peut rejeter $H_0$ et ce rejet est hautement significatif. Alors nous pouvons dire que les scores de manque de plaisir dans moins deux clusters sont différents. Les clusters 1 et 4 sont les seuls dont le manque de plaisir est hautement siginificativement différent avec une p-valeur $=3.94\times 10^{-4}$.
+
+## 3. Néophobie
+```{r include=FALSE}
+  ggplot(data = donnees, aes(x = cls, y=Neophobie, fill=NULL)) + 
+  geom_boxplot(show.legend = TRUE, fill=colors_) + 
+  theme_bw() + labs(x = NULL, y = NULL) 
+```
+![Néophobie](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/neophobie.png)
+```{r include=FALSE}
+k3 <- kruskal_test(Neophobie~cls, data = donnees)
+k3
+# Comparaison par paires
+w3 <- wilcox_test(Neophobie~cls, data = donnees,
+            p.adjust.method = "bonferroni")
+w3
+```
+
+### Test de Kruskal pour la néophobie
+````{r echo = FALSE, results = 'asis'}
+kable(k3)
+````
+
+### Test post-hoc de Wilcoxon Mann Whitney pour la néophobie
+````{r echo = FALSE, results = 'asis'}
+kable(w3)
+
+````
+On a p-valeur $=4.10^{-8}\le 0.001$ donc on peut rejeter $H_0$ et ce rejet est hautement significatif. Alors nous pouvons dire que les scores de néophobie dans moins deux clusters sont différents.
+Le score de la néophobie est hautement significativement différent entre les clusters 1 et 3, clusters 2 et 3 et clusters 2 et 4. Mais cette différence est plus palpable entre les clusters 2 et 3 avec une p-valeur $=1.08\times 10^{-6}$.
+
+## 4. Sélectivité
+```{r include=FALSE}
+  ggplot(data = donnees, aes(x = cls, y=Selectivite, fill=NULL)) + 
+  geom_boxplot(show.legend = TRUE, fill=colors_) + 
+  theme_bw() + labs(x = NULL, y = NULL) 
+```
+![Sélectivité](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/selectivite.png)
+```{r include=FALSE}
+k4 <- kruskal_test(Selectivite~cls, data = donnees)
+k4
+# Comparaison par paires
+w4 <- wilcox_test(Selectivite~cls, data = donnees,
+            p.adjust.method = "bonferroni")
+w4
+```
+
+### Test de Kruskal pour la sélectivité
+````{r echo = FALSE, results = 'asis'}
+kable(k4)
+````
+
+### Test post-hoc de Wilcoxon Mann Whitney pour la sélectivité
+````{r echo = FALSE, results = 'asis'}
+kable(w4)
+
+````
+On a p-valeur $=4.10^{-8}\le 0.001$ donc on peut rejeter $H_0$ et ce rejet est hautement significatif. Alors nous pouvons dire que les scores de sélectivité dans moins deux clusters sont différents.
+Le score de la sélectivité n'est pas significatif entre les clusters 1 et 2 et entre les clusters 3 et 4. Quant aux autres pairs de clusters, ils sont hautement significativement différents. Cette différence est plus remarquable entre les clusters 2 et 3 avec une p-valeur $=9.78\times 10^{-6}$.
+
+## 5. Coercision
+```{r include=FALSE}
+  ggplot(data = donnees, aes(x = cls, y=Coercision, fill=NULL)) + 
+  geom_boxplot(show.legend = TRUE, fill=colors_)+ 
+  scale_y_continuous(limits = c(2, 14), breaks = c(4, 8, 12)) +
+  theme_bw() + labs(x = NULL, y = NULL) 
+```
+![Coercision](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/coercision.png)
+```{r include=FALSE}
+k5 <- kruskal_test(Coercision~cls, data = donnees)
+k5
+# Comparaison par paires
+w5 <- wilcox_test(Coercision~cls, data = donnees,
+            p.adjust.method = "bonferroni")
+w5
+```
+### Test de Kruskal pour la coercision
+````{r echo = FALSE, results = 'asis'}
+kable(k5)
+````
+
+### Test post-hoc de Wilcoxon Mann Whitney pour la coercision
+````{r echo = FALSE, results = 'asis'}
+kable(w5)
+
+````
+On a p-valeur $=8.10^{-4} \le 0.001$ donc on peut rejeter $H_0$ et ce rejet est hautement significatif. Alors nous pouvons dire que les scores de coercision dans moins deux clusters sont différents. On peut remarquer que seuls les clusters 2 et 4 sont très significativement différents pour le score de coercision avec une p-valeur $=2\times 10^{-3}$.
+
+## 6. Explication
+```{r include=FALSE}
+  ggplot(data = donnees, aes(x = cls, y=Explication, fill=NULL)) + 
+  geom_boxplot(show.legend = TRUE, fill=colors_) + 
+  theme_bw() + labs(x = NULL, y = NULL) 
+```
+![Explication](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/explication.png)
+```{r include=FALSE}
+k6 <- kruskal_test(Explication~cls, data = donnees)
+k6
+# Comparaison par paires
+w6 <- wilcox_test(Explication~cls, data = donnees,
+            p.adjust.method = "bonferroni")
+w6
+```
+### Test de Kruskal pour l'explication
+````{r echo = FALSE, results = 'asis'}
+kable(k6)
+````
+### Test post-hoc de Wilcoxon Mann Whitney pour l'explication
+````{r echo = FALSE, results = 'asis'}
+kable(w6)
+
+````
+On a p-valeur $=0.0294 \le 0.05$ donc on peut rejeter $H_0$ et ce rejet est significatif. Alors nous pouvons dire que les scores de explication dans moins deux clusters sont différents. La p-valeur de chaque pair de clusters a une p-valeur supérieur à $5\times 10^{-2}$. Alors nous ne pouvons pas rejeter le fait que les clusters soient identiques quand au score de explication.
+
+## 7. Contingence
+```{r include=FALSE}
+  ggplot(data = donnees, aes(x = cls, y=Contingence, fill=cls)) + 
+  geom_boxplot(show.legend = TRUE, fill=colors_) + 
+  theme_bw() + labs(x = NULL, y = NULL) 
+```
+![Contingence](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/contingence.png)
+
+```{r include=FALSE}
+k7 <- kruskal_test(Contingence~cls, data = donnees)
+k7
+# Comparaison par paires
+w7 <- wilcox_test(Contingence~cls, data = donnees,
+            p.adjust.method = "bonferroni")
+w7
+```
+### Test de Kruskal pour la contingence
+````{r echo = FALSE, results = 'asis'}
+kable(k7)
+````
+
+### Test post-hoc de Wilcoxon Mann Whitney pour la contingence
+````{r echo = FALSE, results = 'asis'}
+kable(w7)
+
+````
+On a p-valeur $=0.1 \ge 0.05$ donc on ne peut pas rejeter $H_0$. Alors les données ne nous permettent pas dire que les scores de contingence dans les clusters sont différents.  La p-valeur de chaque pair de clusters a une p-valeur supérieur à $5\times 10^{-2}$. Alors nous ne pouvons pas rejeter le fait que les clusters soient identiques quand au score de contingence.
+
+## 8. Préférence
+```{r include=FALSE}
+  ggplot(data = donnees, aes(x = cls, y=Preference, fill=NULL)) + 
+  geom_boxplot(show.legend = TRUE, fill=colors_) + 
+  theme_bw() + labs(x = NULL, y = NULL) 
+```
+![Préférence](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/preference.png)
+```{r include=FALSE}
+k8 <- kruskal_test(Preference~cls, data = donnees)
+k8
+# Comparaison par paires
+w8 <- wilcox_test(Preference~cls, data = donnees,
+            p.adjust.method = "bonferroni")
+w8
+```
+### Test de Kruskal pour la préférence
+````{r echo = FALSE, results = 'asis'}
+kable(k8)
+````
+
+### Test post-hoc de Wilcoxon Mann Whitney pour la préférence
+````{r echo = FALSE, results = 'asis'}
+kable(w8)
+
+````
+On a p-valeur $=0.279 \ge 0.05$ donc on ne peut pas rejeter $H_0$. Alors les données ne nous permettent pas dire que les scores de préférence dans les clusters sont différents.  La p-valeur de chaque pair de clusters a une p-valeur supérieur à $5\times 10^{-2}$. Alors nous ne pouvons pas rejeter le fait que les clusters soient identiques quand au score de préférence.
+
+## 9. Biais Perception
+```{r include=FALSE}
+  ggplot(data = donnees, aes(x = cls, y=BiaisPercepParent, fill=NULL)) + 
+  geom_boxplot(show.legend = TRUE, fill=colors_) + 
+  theme_bw() + labs(x = NULL, y = NULL) 
+```
+![Biais perception parentale](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/biaisPercep.png)
+```{r include=FALSE}
+k9 <- kruskal_test(BiaisPercepParent~cls, data = donnees)
+k9
+# Comparaison par paires
+w9 <- wilcox_test(BiaisPercepParent~cls, data = donnees,
+            p.adjust.method = "bonferroni")
+w9
+```
+### Test de Kruskal pour le biais de la perception parentale
+````{r echo = FALSE, results = 'asis'}
+kable(k9)
+````
+
+### Test post-hoc de Wilcoxon Mann Whitney pour le biais de la perception parentale
+````{r echo = FALSE, results = 'asis'}
+kable(w9)
+
+````
+On a p-valeur $=10^{-8} \le 0.05$ donc on peut rejeter $H_0$ et ce rejet est hautement significatif. Alors nous pouvons dire que les scores de biais de perception parentales dans moins deux clusters sont différents. Nous avons deux pairs (clusters 1 et 4 et clusters 2 et 4) qui sont hautement significativement différents quand au score de biais de perception parentales. Et cette différence est plus accentuée entre les clusters 1 et 4 avec une p-valeur $=5.71\times 10^{-8}$.
+
+## 10. Anxiété
+```{r include=FALSE}
+  ggplot(data = donnees, aes(x = cls, y=AnxieteParent, fill=NULL)) + 
+  geom_boxplot(show.legend = TRUE, fill=colors_) + 
+  theme_bw() + labs(x = NULL, y = NULL) 
+```
+![Anxiété parentale](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/anxiete.png)
+```{r include=FALSE}
+k10 <- kruskal_test(AnxieteParent~cls, data = donnees)
+k10
+# Comparaison par paires
+w10 <- wilcox_test(AnxieteParent~cls, data = donnees,
+            p.adjust.method = "bonferroni")
+w10
+```
+### Test de Kruskal pour l'anxiété parentale
+````{r echo = FALSE, results = 'asis'}
+kable(k10)
+````
+
+### Test post-hoc de Wilcoxon Mann Whitney pour l'anxiété parentale
+````{r echo = FALSE, results = 'asis'}
+kable(w10)
+
+````
+On a p-valeur $\le 2.31\times10^{-46} \le 0.001$ donc le rejet de $H_0$ est hautement significatif. Alors nous pouvons dire que les anxiétés parentales dans moins deux clusters sont différentes. Tous les pairs des clusters sont hautement significativement différents quand au score de anxiété sauf le pair 2 et 3 qui est simple significatif. Le couple 1 et 4 a une p-valeur la plus élevée égale à $6.48\time 10^{-29}$.
+
+## 11. Âge enfant
+```{r include=FALSE}
+  ggplot(data = donnees, aes(x = cls, y=AgeEft, fill=NULL)) + 
+  geom_boxplot(show.legend = TRUE, fill=colors_) + 
+  theme_bw() + labs(x = NULL, y = NULL) 
+```
+![Âge des enfants](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/ageEnfant.png)
+```{r include=FALSE}
+k11 <- kruskal_test(AgeEft~cls, data = donnees)
+k11
+# Comparaison par paires
+w11 <- wilcox_test(AgeEft~cls, data = donnees,
+            p.adjust.method = "bonferroni")
+w11
+```
+### Test de Kruskal pour l'âge des enfants
+````{r echo = FALSE, results = 'asis'}
+kable(k11)
+````
+
+### Test post-hoc de Wilcoxon Mann Whitney pour l'âge des enfants
+````{r echo = FALSE, results = 'asis'}
+kable(w11)
+
+````
+On a p-valeur $=6.18\times10^{-4} \le 0.05$ donc on peut rejeter $H_0$ et ce rejet est hautement significatif. Alors nous pouvons dire que les âges des enfants dans moins deux clusters sont différents. L'âge des enfant est hautement significativement différent entre les clusters 2 et 3 avec une p-valeur $=5\times 10^{-4}$
+
+## 12. Âge de la mère
+```{r include=FALSE}
+  ggplot(data = donnees, aes(x = cls, y=AgeMere, fill=NULL)) + 
+  geom_boxplot(show.legend = TRUE, fill=colors_) + 
+  theme_bw() + labs(x = NULL, y = NULL) 
+```
+![Âge des mères](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/ageMere.png)
+```{r include=FALSE}
+k12 <- kruskal_test(AgeMere~cls, data = donnees)
+k12
+# Comparaison par paires
+w12 <- wilcox_test(AgeMere~cls, data = donnees,
+            p.adjust.method = "bonferroni")
+w12
+```
+### Test de Kruskal pour l'âge des mères
+````{r echo = FALSE, results = 'asis'}
+kable(k12)
+````
+
+### Test post-hoc de Wilcoxon Mann Whitney pour l'âge des mères
+````{r echo = FALSE, results = 'asis'}
+kable(w12)
+
+````
+On a p-valeur $=5.42\times10^{-33} \le 0.05$ donc on peut rejeter $H_0$ et ce rejet est hautement significatif. Alors nous pouvons dire que les âges des mères dans moins deux clusters sont différents. Tous les pairs de clusters sont hautement significativement différents quand au l'âge des mères. Le couple 2 et 3 a la p-valeur la plus grande; égale à $1.7\times 10^{-21}$.
+
+## 13. Âge du père
+```{r include=FALSE}
+  ggplot(data = donnees, aes(x = cls, y=AgePere, fill=NULL)) + 
+  geom_boxplot(show.legend = TRUE, fill=colors_) + 
+  theme_bw() + labs(x = NULL, y = NULL) 
+```
+![Äge des pères](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/agePere.png)
+```{r include=FALSE}
+k13 <- kruskal_test(AgePere~cls, data = donnees)
+k13
+# Comparaison par paires
+w13 <- wilcox_test(AgePere~cls, data = donnees,
+            p.adjust.method = "bonferroni")
+w13
+```
+### Test de Kruskal pour l'âge des pères
+````{r echo = FALSE, results = 'asis'}
+kable(k13)
+````
+
+### Test post-hoc de Wilcoxon Mann Whitney pour l'âge des pères
+````{r echo = FALSE, results = 'asis'}
+kable(w13)
+
+````
+On a p-valeur $=3.17\times10^{-32} \le 0.05$ donc on peut rejeter $H_0$ et ce rejet est hautement significatif. Alors nous pouvons dire que les âges des pères dans moins deux clusters sont différents.  Tous les pairs de clusters sont hautement significativement différents quand au l'âge des pères excepté le couple 2 et 4 qui est très significatif. Et le pair de clusters 2 et 3 a la p-valeur la plus élevée; égale à $4.72\times 10^{-20}$.
+
+## 14. Taille pour âge
+```{r include=FALSE}
+  ggplot(data = donnees, aes(x = cls, y=TailleAge, fill=NULL)) + 
+  geom_boxplot(show.legend = TRUE, fill=colors_) + 
+  theme_bw() + labs(x = NULL, y = NULL) 
+```
+![Tailles pour âge](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/tailleAge.png)
+```{r include=FALSE}
+kruskal_test(TailleAge~cls, data = donnees)
+# Comparaison par paires
+wilcox_test(TailleAge~cls, data = donnees,
+            p.adjust.method = "bonferroni")
+```
+On a p-valeur $=0.396 \ge 0.05$ donc on ne peut pas rejeter $H_0$. Alors les données ne nous permettent pas dire que les tailles pour âge des enfants dans les clusters sont différents. La p-valeur de chaque pair de clusters a une p-valeur supérieur à $5\times 10^{-2}$. Alors nous ne pouvons pas rejeter le fait que les clusters soient identiques quand à la taille pour âge des enfants.
+
+## 15. Poids pour âge
+```{r include=FALSE}
+  ggplot(data = donnees, aes(x = cls, y=PoidsAge, fill=NULL)) + 
+  geom_boxplot(show.legend = TRUE, fill=colors_) + 
+  theme(aspect.ratio = 1) + labs(x = NULL, y = NULL) 
+```
+[!Poids pour âge](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/poidsAge.png)
+
+```{r include=FALSE}
+kruskal_test(PoidsAge~cls, data = donnees)
+# Comparaison par paires
+wilcox_test(PoidsAge~cls, data = donnees,
+            p.adjust.method = "bonferroni")
+```
+On a p-valeur $=0.316 \ge 0.05$ donc on ne peut pas rejeter $H_0$. Alors les données ne nous permettent pas dire que les poids pour âge des enfants dans les clusters sont différents. La p-valeur de chaque pair de clusters a une p-valeur supérieur à $5\times 10^{-2}$. Alors nous ne pouvons pas rejeter le fait que les clusters soient identiques quand au poids pour âge des enfants.
+
+## 15. Poids pour taille
+```{r include=FALSE}
+  ggplot(data = donnees, aes(x = cls, y=PoidsTaille, fill=NULL)) + 
+  geom_boxplot(show.legend = TRUE, fill=colors_) + 
+  theme_bw() + labs(x = NULL, y = NULL) 
+```
+![Poids pour taille](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/poidsTaille.png)
+```{r include=FALSE}
+kruskal_test(PoidsTaille~cls, data = donnees)
+# Comparaison par paires
+wilcox_test(PoidsTaille~cls, data = donnees,
+            p.adjust.method = "bonferroni")
+```
+On a p-valeur $=0.2.273 \ge 0.05$ donc on ne peut pas rejeter $H_0$. Alors les données ne nous permettent pas dire que les poids pour taille des enfants dans les clusters sont différents. La p-valeur de chaque pair de clusters a une p-valeur supérieur à $5\times 10^{-2}$. Alors nous ne pouvons pas rejeter le fait que les clusters soient identiques quand au poids pour taille des enfants.
+
+# III. Démographique et socio-économique
+## 1. Le genre 
+````{r include=FALSE}
+chisq.test(table(donnees[, c('GenreEft', 'cls')]))
+````
+Degré de liberté : ddl$=3$.
+Nous avons une p-valeur $=0.4$ donc les données ne nous permettent pas de rejeter $H_0$. Ainsi nous pouvons dire qu'il n'y a pas une différence significative dans la répartition des 4 clusters quant au genre des enfants. Nous pouvons aussi dire le fait de connaître le genre d'un enfant ne permet pas d'identifier le cluster auquel il peut appartenir.
+
+## 2. Naissance prématurée ou à terme 
+````{r include=FALSE}
+chisq.test(table(donnees[, c('NaisTermeGros', 'cls')]))
+````
+Degré de liberté : ddl$=3$.
+Nous avons une p-valeur $=0.8$ donc les données ne nous permettent pas de rejeter $H_0$. Ainsi nous pouvons dire qu'il n'y a pas une différence significative dans la répartition des 4 clusters quant à la naissance prématurée ou à terme des enfants. Aussi nous pouvons dire le fait qu'un enfant soit né prématurément ou non ne permet pas d'identifier le cluster auquel il peut appartenir.
+
+## 3. Hospitalisation
+````{r include=FALSE}
+chisq.test(table(donnees[, c('EftHospitalPlus1Nuit', 'cls')]))
+````
+Degré de liberté : ddl$=3$.
+Nous avons une p-valeur $=0.7$ donc les données ne nous permettent pas de rejeter $H_0$. Ainsi nous pouvons dire qu'il n'y a pas une différence significative dans la répartition des 4 clusters quant à l'hospitalisation des enfants plus d'une nuit. Aussi, le fait qu'un enfant soit hospitalisé plus d'une nuit ou non est indépendant du cluster auquel il appartient.
+
+## 4. Niveau d'étude de la mère 
+````{r include=FALSE}
+chisq.test(table(donnees[, c('NiveauEtudeMere', 'cls')]), simulate.p.value = T)
+````
+Degré de liberté : ddl$=15$.
+Nous avons une p-valeur $=0.1$ donc les données ne nous permettent pas de rejeter $H_0$. Ainsi nous pouvons dire qu'il n'y a pas une différence significative dans la répartition des 4 clusters quant au niveau d'étude des mères. Nous pouvons aussi conclure la non dépendance du niveau d'étude de la mère avec le cluster auquel l'enfant appartient.
+
+## 5. Statut salarié de la mère 
+````{r include=FALSE}
+chisq.test(table(donnees[, c('MereSalariee', 'cls')]), simulate.p.value = T)
+````
+Degré de liberté : ddl$=12$.
+Nous avons une p-valeur $=0.2$ donc les données ne nous permettent pas de rejeter $H_0$. Ainsi nous pouvons dire qu'il n'y a pas une différence significative dans la répartition des 4 clusters quant au statut salarié des mères. Nous pouvons aussi conclure que le statut salarial de la mère n'a pas d'effet sur le cluster d'appartenance de l'enfant.
+
+## 6. Niveau d'étude du père 
+````{r include=FALSE}
+chisq.test(table(donnees[, c('NiveauEtudePere', 'cls')]), simulate.p.value = T)
+````
+Degré de liberté : ddl$=15$.
+Nous avons une p-valeur $=0.2$ donc les données ne nous permettent pas de rejeter $H_0$. Ainsi nous pouvons dire qu'il n'y a pas une différence significative dans la répartition des 4 clusters quant au niveau d'étude des pères. Nous pouvons aussi conclure la non dépendance du niveau d'étude du père avec le cluster auquel l'enfant appartient.
+
+## 7. Statut salarié du père
+````{r include=FALSE}
+chisq.test(table(donnees[, c('PereSalarie', 'cls')]), simulate.p.value = T)
+````
+Degré de liberté : ddl$=12$.
+Nous avons une p-valeur $=0.9$ donc les données ne nous permettent pas de rejeter $H_0$. Ainsi nous pouvons dire qu'il n'y a pas une différence significative dans la répartition des 4 clusters quant au statut salarié des pères. Nous pouvons aussi conclure que le statut salarial du père n'a pas d'effet sur le cluster d'appartenance de l'enfant.
+
+## 8. Tranche de revenu du foyer
+````{r include=FALSE}
+(c8 <- chisq.test(table(donnees[, c('RevenuAnFoyer', 'cls')])))
+````
+````{r include = FALSE}
+# khi2_postHoc permet d'exécuter le test de kh2 par paire
+# de colonnes
+khi2_postHoc <- function(x, round=4, simul=F){
+  nameCol <- NULL
+  result <- NULL
+  num_col = length(colnames(x))
+  if(num_col == 0)
+    nameCol <- paste('column', 1:num_col, sep = '')
+  else
+    nameCol <- colnames(x)
+  i = 1; j = 1
+  while (i <= num_col) {
+    j = 1 + i
+    while (j <= num_col) {
+      test <- chisq.test(x[, nameCol[c(i, j)]], simulate.p.value = simul)
+      p.signif = 'ns'
+      if(test$p.value <= 0.001)
+        p.signif = '***'
+      if(0.001 < test$p.value & test$p.value <= 0.01)
+        p.signif = '**'
+      if(0.01 < test$p.value & test$p.value <= 0.05)
+        p.signif = '*'
+      
+      result[[paste0(nameCol[i], ' vs ', nameCol[j])]] <- c(
+        round(test$statistic, round), test$parameter, 
+        'p.value'=round(test$p.value, round), 'p.signif'=p.signif)
+      j = j + 1
+    }
+    i = i + 1
+  }
+  return(t(as.data.frame(result)))
+}
+````
+
+```{r include=FALSE}
+library(cowplot)
+df_revenu <- as.data.frame(table(donnees[, c('RevenuAnFoyer', 'cls')]))
+df_rev <- table(donnees[, c('RevenuAnFoyer', 'cls')])
+
+par(mfrow=c(2, 2))
+bar1 <- ggplot(data = df_revenu[df_revenu$cls=='cluster1', ], aes(x = '', y = Freq, fill=RevenuAnFoyer)) + 
+  geom_bar(show.legend = TRUE, width = 1, stat = 'identity') + 
+  theme(aspect.ratio = 1) + labs(fill="Revenu Foyer") + scale_fill_discrete(
+    breaks=c("< 15000","De 15000 - 25000","De 25000 - 35000", "De 35000 - 45000", "> 45000"))
+pie1 <- bar1 + coord_polar('y', start = 0) + 
+  ggtitle('Cluster 1')
+
+bar2 <- ggplot(data = df_revenu[df_revenu$cls=='cluster2', ], aes(x = '', y = Freq, fill=RevenuAnFoyer)) + 
+  geom_bar(show.legend = TRUE, width = 1, stat = 'identity') + 
+  theme(aspect.ratio = 1) + labs(fill="Revenu Foyer") + scale_fill_discrete(
+    breaks=c("< 15000","De 15000 - 25000","De 25000 - 35000", "De 35000 - 45000", "> 45000"))
+pie2 <- bar2 + coord_polar('y', start = 0) + 
+  ggtitle('Cluster 2')
+
+bar3 <- ggplot(data = df_revenu[df_revenu$cls=='cluster3', ], aes(x = '', y = Freq, fill=RevenuAnFoyer)) + 
+  geom_bar(show.legend = TRUE, width = 1, stat = 'identity') + 
+  theme(aspect.ratio = 1) + labs(fill="Revenu Foyer") + scale_fill_discrete(
+    breaks=c("< 15000","De 15000 - 25000","De 25000 - 35000", "De 35000 - 45000", "> 45000"))
+ pie3 <- bar3+ coord_polar('y', start = 0) + 
+  ggtitle('Cluster 3')
+
+bar4 <- ggplot(data = df_revenu[df_revenu$cls=='cluster4', ], aes(x = '', y = Freq, fill=RevenuAnFoyer)) + 
+  geom_bar(show.legend = TRUE, width = 1, stat = 'identity') + 
+  theme(aspect.ratio = 1) + labs(fill="Revenu Foyer") + scale_fill_discrete(
+    breaks=c("< 15000","De 15000 - 25000","De 25000 - 35000", "De 35000 - 45000", "> 45000"))
+pie4 <- bar4 + coord_polar('y', start = 0) + 
+  ggtitle('Cluster 4')
+
+plot_grid(pie1, pie2, pie3, pie4, nrow = 2, ncol = 2)
+```
+![](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/revenuAnnuelFoyer.png)
+
+
+### Tableau des proportions
+````{r echo = FALSE, results = 'asis'}
+# library(knitr)
+kable(addmargins(prop.table(df_rev)))
+````
+
+### Test de Khi2 post hoc
+````{r echo = FALSE, results = 'asis'}
+# library(knitr)
+kable(khi2_postHoc(table(donnees[, c('RevenuAnFoyer', 'cls')])))
+````
+Degré de liberté : ddl$=12$.
+On a $10^{-2}\le$ p-valeur $=2\times 10^{-2}\le 5\times 10^{-2}$, alors le rejet de $H_0$ est significatif. Ainsi nous pouvons dire qu'au moins un cluster est significativement différent des autres quant au revenu annuel du foyer. On peut prétendre aussi qu'il y a un lien entre le revenu annuel du foyer et le cluster auquel l'enfant appartient.
+Le test post hoc effectué nous permet de contacter une différence significative entre cluster1 et cluster2, cluster1 et cluster 4 et cluster3 et cluster4.
+
+## 9. Parents en couple
+````{r include=FALSE}
+chisq.test(table(donnees[, c('VieCouple', 'cls')]))
+````
+Degré de liberté : ddl$=3$.
+Nous avons une p-valeur $=1$ donc les données ne nous permettent pas de rejeter $H_0$. Ainsi nous pouvons dire qu'il n'y a pas une différence significative dans la répartition des 4 clusters quant à la vie en couple des parents. Nous pouvons dire aussi que le fait les parents soient en couple est indépendant du cluster auquel l'enfant appartient. 
+
+## 10. Enfants allergiques
+````{r include=FALSE}
+chisq.test(table(donnees[, c('EftAll', 'cls')]))
+````
+Degré de liberté : ddl$=3$.
+Nous avons une p-valeur $=0.09$ donc les données ne nous permettent pas de rejeter $H_0$. Ainsi nous pouvons dire qu'il n'y a pas une différence significative dans la répartition des 4 clusters quant au fait qu'un enfant soit allergique ou non. On peut aussi dire que lorsqu'un enfant est allergique ou non ne permet l'identification de son cluster d'appartenance.
+
+## 11. Déménagement des parents depuis la naissance
+````{r include=FALSE}
+chisq.test(table(donnees[, c('NbreDemenageDep8Nais', 'cls')]), simulate.p.value = T)
+````
+
+```{r include=FALSE}
+df_demenage <- as.data.frame(table(donnees[, c('NbreDemenageDep8Nais', 'cls')]))
+df_dem <- table(donnees[, c('NbreDemenageDep8Nais', 'cls')])
+
+par(mfrow=c(2, 2))
+bar1 <- ggplot(data = df_demenage[df_demenage$cls=='cluster1', ], aes(x = '', y = Freq, fill=NbreDemenageDep8Nais)) + 
+  geom_bar(show.legend = TRUE, width = 1, stat = 'identity') + 
+  theme(aspect.ratio = 1) + labs(fill='Nombre déménagement') + scale_fill_discrete(
+    breaks=c("0 fois","1 fois","2 fois", "> 2 fois"))
+pie1 <- bar1 + coord_polar('y', start = 0) + 
+  ggtitle('Cluster 1')
+
+bar2 <- ggplot(data = df_demenage[df_demenage$cls=='cluster2', ], aes(x = '', y = Freq, fill=NbreDemenageDep8Nais)) + 
+  geom_bar(show.legend = TRUE, width = 1, stat = 'identity') + 
+  theme(aspect.ratio = 1) + labs(fill='Nombre déménagement') + scale_fill_discrete(
+    breaks=c("0 fois","1 fois","2 fois", "> 2 fois"))
+pie2 <- bar2 + coord_polar('y', start = 0) + 
+  ggtitle('Cluster 2')
+
+bar3 <- ggplot(data = df_demenage[df_demenage$cls=='cluster3', ], aes(x = '', y = Freq, fill=NbreDemenageDep8Nais)) + 
+  geom_bar(show.legend = TRUE, width = 1, stat = 'identity') + 
+  theme(aspect.ratio = 1) + labs(fill='Nombre déménagement') + scale_fill_discrete(
+    breaks=c("0 fois","1 fois","2 fois", "> 2 fois"))
+ pie3 <- bar3+ coord_polar('y', start = 0) + 
+  ggtitle('Cluster 3')
+
+bar4 <- ggplot(data = df_demenage[df_demenage$cls=='cluster4', ], aes(x = '', y = Freq, fill=NbreDemenageDep8Nais)) + 
+  geom_bar(show.legend = TRUE, width = 1, stat = 'identity') + 
+  theme(aspect.ratio = 1) + labs(fill='Nombre déménagement') + scale_fill_discrete(
+    breaks=c("0 fois","1 fois","2 fois", "> 2 fois"))
+pie4 <- bar4 + coord_polar('y', start = 0) + 
+  ggtitle('Cluster 4')
+
+plot_grid(pie1, pie2, pie3, pie4, nrow = 2, ncol = 2)
+```
+![](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/demenagementDep8Nais.png)
+
+### Tableau des proportions
+````{r echo = FALSE, results = 'asis'}
+# library(knitr)
+kable(addmargins(prop.table(df_dem)))
+````
+
+### Test de Khi2 post hoc
+````{r echo = FALSE, results = 'asis', warning = FALSE}
+# library(knitr)
+kable(khi2_postHoc(table(donnees[, c('NbreDemenageDep8Nais', 'cls')])))
+````
+Degré de liberté : ddl$=9$.
+On a $10^{-2}\le$ p-valeur $=3\times 10^{-2}\le 5\times 10^{-2}$, alors le rejet de $H_0$ est significatif. Ainsi nous pouvons dire qu'au moins un cluster est significativement différent des autres quant au nombre de déménagement des parents depuis la naissance de l'enfant. On peut prétendre aussi qu'il y a un lien entre le nombre de déménagement des parents depuis la naissance de l'enfant et le cluster auquel l'enfant appartient.
+
+Le test post hoc nous permet de remarquer que seuls les clusters 1 et 3 sont différents et cette différence est très significative.
+
+## 12 CSP de la mère
+````{r echo = FALSE, results = 'asis', warning = FALSE}
+chisq.test(table(donnees[, c('CSPMere', 'cls')]))
+````
+Degré de liberté : ddl$=75$.
+Nous avons une p-valeur $=0.05$ donc les données ne nous permettent pas de rejeter $H_0$. Ainsi nous pouvons dire qu'il n'y a pas une différence significative dans la répartition des 4 clusters quant à la catégorie socio-professionnelle des Mères.
+
+## 13 CSP du père
+````{r echo = FALSE, results = 'asis', warning = FALSE}
+chisq.test(table(donnees[, c('CSPPere', 'cls')]), simulate.p.value = TRUE)
+````
+Degré de liberté : ddl$=93$.
+Nous avons une p-valeur $=0.08$ donc les données ne nous permettent pas de rejeter $H_0$. Ainsi nous pouvons dire qu'il n'y a pas une différence significative dans la répartition des 4 clusters quant à la catégorie socio-professionnelle des pères.
+
+# IV. Question
+
+![](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/distorsion_gris.png)
+
+![](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/silhouette_gris.png)
+
+![](/Users/djibrila/Desktop/M2-SAAD/stage_proj/images/cluster_gris.png)
+
+````{r echo = FALSE, results = 'asis', include = FALSE}
+library(stringr)
+var_demandees <- c('ManqueAppetit', 'ManquePlaisir', 'Neophobie',
+                   'Selectivite', 'Coercision', 'BiaisPercepParent',
+                   'AnxieteParent', 'AgeEft', 'AgeMere', 'AgePere')
+result <- NULL
+valeurs_ext <- NULL
+for (v in var_demandees) {
+  df <- donnees[, v]
+  q3 <- summary(df)[['3rd Qu.']]
+  q1 <- summary(df)[['1st Qu.']]
+  q2 <- summary(df)[['Median']]
+  bv <- boxplot(df ~ donnees$cls)
+  valeurs_ext[[v]] <- data.frame('valeurs ext.'=bv$out, 'cluster'=bv$group)
+  result[[v]] <- c('1e quartile'=q1, 'mediane'=q2,
+                  '3eme quartile'=q3)
+}
+````
+
+````{r echo = FALSE, results = 'asis'}
+kable(valeurs_ext['ManqueAppetit'], caption = 'Manque Appetit')
+````
+
+````{r echo = FALSE, results = 'asis'}
+kable(valeurs_ext['ManquePlaisir'], caption = 'Manque Plaisir')
+````
+
+````{r echo = FALSE, results = 'asis'}
+kable(valeurs_ext['Neophobie'], caption = 'Néophobie')
+````
+
+````{r echo = FALSE, results = 'asis'}
+kable(valeurs_ext['Selectivite'], caption = 'Sélectivité')
+````
+
+````{r echo = FALSE, results = 'asis'}
+kable(valeurs_ext['Coercision'], caption = 'Coercision')
+````
+
+````{r echo = FALSE, results = 'asis'}
+kable(valeurs_ext['BiaisPercepParent'], caption = 'Biais Perception Parentale')
+````
+
+````{r echo = FALSE, results = 'asis'}
+kable(valeurs_ext['AnxieteParent'], caption = 'Anxiété Parentale')
+````
+
+````{r echo = FALSE, results = 'asis'}
+kable(valeurs_ext['AgeEft'], caption = 'Âge Enfant')
+````
+
+````{r echo = FALSE, results = 'asis'}
+kable(valeurs_ext['AgeMere'], caption = 'Âge Mère')
+````
+
+````{r echo = FALSE, results = 'asis'}
+kable(valeurs_ext['AgePere'], caption = 'Âge Père')
+````
+
+### Quartile
+````{r echo = FALSE, results = 'asis'}
+kable(t(as.data.frame(result)), digits = 3)
+````
+
